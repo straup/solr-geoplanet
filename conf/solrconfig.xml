@@ -1,0 +1,170 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+
+<config>
+    <abortOnConfigurationError>${solr.abortOnConfigurationError:true}</abortOnConfigurationError>
+    <dataDir>${solr.solr.home}/solr-geoplanet/data</dataDir>
+
+    <indexDefaults>
+        <useCompoundFile>false</useCompoundFile>
+        <mergeFactor>10</mergeFactor>
+        <ramBufferSizeMB>128</ramBufferSizeMB>
+        <maxMergeDocs>2147483647</maxMergeDocs>
+        <maxFieldLength>10000</maxFieldLength>
+        <writeLockTimeout>1000</writeLockTimeout>
+        <commitLockTimeout>10000</commitLockTimeout>
+        <lockType>single</lockType>
+    </indexDefaults>
+
+    <mainIndex>
+        <useCompoundFile>false</useCompoundFile>
+        <ramBufferSizeMB>64</ramBufferSizeMB>
+
+	<!-- 
+	Determines how often low-level Lucene segments are merged. Smaller
+	values (the minimum value is 2) use less memory but result in slower
+	indexing times. Larger values yield faster indexing times at the cost of
+	more memory. 
+	-->
+        <mergeFactor>10</mergeFactor>
+
+	<!--
+	Controls the maximum number of Documents ever merged by Solr. Smaller values (<
+	10,000) are best for applications with a large number of updates.
+	-->
+        <maxMergeDocs>2147483647</maxMergeDocs>
+        <!-- <maxMergeDocs>10000</maxMergeDocs> -->
+
+	<!--
+	Defines the minimum number of documents that need to be indexed before in-memory
+	documents are merged and a new segment is created. A segment is a Lucene file
+	for storing index information. Larger values yield faster indexing at the cost
+	of more memory.
+
+	If both ramBufferSizeMB and maxBufferedDocs is set, then Lucene will flush
+	based on whichever limit is hit first.
+	-->
+	<maxBufferedDocs>10000</maxBufferedDocs>
+
+        <maxFieldLength>10000</maxFieldLength>
+        <unlockOnStartup>false</unlockOnStartup>
+        <deletionPolicy class="solr.SolrDeletionPolicy">
+            <str name="keepOptimizedOnly">false</str>
+            <str name="maxCommitsToKeep">1</str>
+        </deletionPolicy>
+
+ 	<lockType>native</lockType>
+    </mainIndex>
+
+    <updateHandler class="solr.DirectUpdateHandler2">
+	<autoCommit>
+        	<maxDocs>1000</maxDocs>
+        	<maxTime>60000</maxTime>
+    	</autoCommit>
+    </updateHandler>
+
+    <query>
+        <maxBooleanClauses>1024</maxBooleanClauses>
+
+        <filterCache
+                class="solr.FastLRUCache"
+                size="512"
+                initialSize="512"
+                autowarmCount="128"/>
+        <queryResultCache
+                class="solr.LRUCache"
+                size="512"
+                initialSize="512"
+                autowarmCount="32"/>
+        <documentCache
+                class="solr.LRUCache"
+                size="512"
+                initialSize="512"
+                autowarmCount="0"/>
+        <enableLazyFieldLoading>true</enableLazyFieldLoading>
+        <queryResultWindowSize>50</queryResultWindowSize>
+        <queryResultMaxDocsCached>200</queryResultMaxDocsCached>
+        <HashDocSet maxSize="3000" loadFactor="0.75"/>
+        <useColdSearcher>false</useColdSearcher>
+        <maxWarmingSearchers>2</maxWarmingSearchers>
+    </query>
+
+    <requestDispatcher handleSelect="true">
+        <requestParsers enableRemoteStreaming="true" multipartUploadLimitInKB="2048000" />
+        <httpCaching lastModifiedFrom="openTime" etagSeed="Solr">
+        </httpCaching>
+    </requestDispatcher>
+
+   <searchComponent name="geoDistance" class="nl.jteam.search.solrext.spatial.GeoDistanceComponent"/>
+
+    <requestHandler name="standard" class="solr.SearchHandler" default="true">
+        <lst name="defaults">
+            <str name="echoParams">explicit</str>
+        </lst>
+        <arr name="components">
+            <str>query</str>
+	    <str>facet</str>
+	    <str>mlt</str>
+            <str>geoDistance</str>
+            <str>debug</str>
+        </arr>
+    </requestHandler>
+
+    <requestHandler name="/update" class="solr.XmlUpdateRequestHandler"/>
+
+    <updateRequestProcessorChain>
+        <processor class="nl.jteam.search.solrext.spatial.SpatialTierUpdateProcessorFactory">
+            <str name="latField">latitude</str>
+            <str name="lngField">longitude</str>
+            <int name="startTier">9</int>
+            <int name="endTier">17</int>
+        </processor>
+        <processor class="solr.LogUpdateProcessorFactory"/>
+        <processor class="solr.RunUpdateProcessorFactory"/>
+    </updateRequestProcessorChain>
+
+    <!-- replication: http://wiki.apache.org/solr/SolrReplication -->
+	
+    <requestHandler name="/replication" class="solr.ReplicationHandler" >
+        <lst name="master">
+        	<str name="replicateAfter">commit</str>
+        	<str name="replicateAfter">optimize</str>
+        	<str name="backupAfter">optimize</str>
+        	<str name="confFiles">schema.xml,stopwords.txt,elevate.xml</str>
+
+		<!-- This ensures that the local configuration
+		'solrconfig_slave.xml' will be saved as 'solrconfig.xml' on the
+		slave. All other files will be saved with their original
+		names. -->
+
+		<!-- <str name="confFiles">solrconfig_slave.xml:solrconfig.xml,x.xml,y.xml</str> -->
+
+        	<str name="httpBasicAuthUser"></str>
+        	<str name="httpBasicAuthPassword"></str>
+    	</lst>
+
+	<!--
+	<lst name="slave">
+        	<str name="masterUrl">http://localhost:port/solr/corename/replication</str>  
+        	<str name="pollInterval">00:00:20</str>  
+        	<str name="httpBasicAuthUser"></str>
+        	<str name="httpBasicAuthPassword"></str>
+    	</lst>
+	-->
+
+    </requestHandler>
+
+    <!-- geo -->
+ 	    
+    <queryParser name="spatial" class="nl.jteam.search.solrext.spatial.SpatialTierQueryParserPlugin">
+        <str name="latField">latitude</str>
+        <str name="lngField">longitude</str>
+        <str name="corePoolSize">1</str>
+        <str name="maxPoolSize">2</str>
+        <str name="keepAlive">60</str>
+    </queryParser>
+
+    <admin>
+        <defaultQuery>solr</defaultQuery>
+    </admin>
+
+</config>
