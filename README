@@ -1,8 +1,19 @@
+# The long version: http://www.aaronland.info/weblog/2009/12/21/redacted/#woelr
+
+--
+
+This assumes you're using Solr in "multiple core" mode. If you're not sure what
+that means, start here: 
+
+	http://wiki.apache.org/solr/CoreAdmin
+
 In solr/solr.xml add the following to <cores> :
 
 	<core name="geoplanet" instanceDir="solr-geoplanet">
 		<property name="dataDir" value="solr-geoplanet/data" />
 	</core>
+
+--
 
 To start Solr:
 
@@ -12,7 +23,9 @@ To start Solr:
 	$> cd /path/to/solr
 	$> java -Dsolr.solr.home=. -Xmx256m -jar start.jar
 
-Importing data:
+--
+
+Importing GeoPlanet data:
 
 	# Fetch the geoplanet data dump you want to work with:
 
@@ -101,6 +114,8 @@ Importing data:
 		--solr 'http://localhost:8983/solr/geoplanet' \
 		--data /path/to/geoplanet-7.4.0 \
 		--version '7.4.0'
+
+--
 
 Importing the Flickr public shapefiles dataset:
 
