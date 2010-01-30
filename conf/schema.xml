@@ -67,7 +67,9 @@
 
 	<fieldType name="value" class="solr.TextField" sortMissingLast="true" omitNorms="true">
 		<analyzer type="index">
+			<!-- this needs to be able to recognize quotes -->
 			<tokenizer class="solr.PatternTokenizerFactory" pattern="^(?:(?:[a-zA-Z]|\d)(?:\w+)?)\:(?:(?:[a-zA-Z]|\d)(?:\w+)?)=(.+)" group="1" />
+			<filter class="solr.TrimFilterFactory" />
 			<filter class="solr.WordDelimiterFilterFactory" generateWordParts="1" generateNumberParts="1" catenateWords="1" catenateNumbers="1" catenateAll="0" splitOnCaseChange="1" preserveOriginal="0" />
 
 		</analyzer>
@@ -79,8 +81,7 @@
 
 	<fieldType name="value_float" class="solr.TextField" sortMissingLast="true" omitNorms="true">
 		<analyzer type="index">
-			<!-- not sure this is working properly yet... -->
-			<tokenizer class="solr.PatternTokenizerFactory" pattern="^(?:(?:[a-zA-Z]|\d)(?:\w+)?)\:(?:(?:[a-zA-Z]|\d)(?:\w+)?)=(\d+)" group="1" />
+			<tokenizer class="solr.PatternTokenizerFactory" pattern="^(?:(?:[a-zA-Z]|\d)(?:\w+)?)\:(?:(?:[a-zA-Z]|\d)(?:\w+)?)=(-?\d+(?:\.\d+)?)" group="1" />
 		</analyzer>
 		<analyzer type="query">
 			<tokenizer class="solr.WhitespaceTokenizerFactory" />
