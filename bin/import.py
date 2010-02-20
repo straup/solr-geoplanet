@@ -22,15 +22,19 @@ parser.add_option("-P", "--purge", dest="purge", help="...", default=None, actio
 
 #
 
+provider = "geoplanet %s" % opts.version
+
+#
+
 gp_places = os.path.join(opts.data, 'geoplanet_places_%s.tsv' % opts.version)
 gp_sqlite = os.path.join(opts.data, 'geoplanet_sqlite_%s.db' % opts.version)
 
 for f in (gp_places, gp_sqlite) :
 	if not os.path.exists(f) :
-        	print "%s does not exist" % f 
+        	print "%s does not exist" % f
         	sys.exit()
 
-#        
+#
 
 solr = pysolr.Solr(opts.solr)
 
@@ -71,19 +75,19 @@ except Exception, e :
 for ln in codecs.open(gp_places, encoding='utf-8') :
 
         total += 1
-        
+
 	if total == 1 :
             	continue
 
 	ln = ln.strip()
 
 	woeid, iso, name, lang, placetype, parent = ln.split('\t')
-        
+
         name = name.replace('"', '')
         iso = iso.replace('"', '')
-        lang = lang.replace('"', '')        
+        lang = lang.replace('"', '')
         woeid = int(woeid)
-        
+
         doc = {'woeid' : int(woeid),
                'parent_woeid' : int(parent),
                'adjacent_woeid' : [],
@@ -91,7 +95,8 @@ for ln in codecs.open(gp_places, encoding='utf-8') :
                'name' : name,
                'names' : [ { 'value' : name, 'boost' : '1.5' } ],
                'iso' : unicode(iso),
-               'lang' : unicode(lang) }
+               'lang' : unicode(lang),
+	       'provider' : unicode(provider) }
 
 	# aliases
 
@@ -101,8 +106,8 @@ for ln in codecs.open(gp_places, encoding='utf-8') :
                 alias_woeid, alias_name, alias_type, alias_lang = row
 
         	alias_type = alias_type.replace('"', '')
-        	alias_name = alias_name.replace('"', '')                
-                
+        	alias_name = alias_name.replace('"', '')
+
 		key = "alias_%s" % alias_lang
 
                 if alias_type != '' :
@@ -116,9 +121,9 @@ for ln in codecs.open(gp_places, encoding='utf-8') :
 
                 else :
                 	doc[ key ] = alias_name
-                        
+
                 doc[ 'names' ].append(alias_name)
-        
+
 	# adjacencies
 
 	res = db.execute("SELECT * FROM geoplanet_adjacencies WHERE woeid=%s" % addslashes(woeid))
@@ -130,33 +135,33 @@ for ln in codecs.open(gp_places, encoding='utf-8') :
 	# superceded by
 
         if has_changes :
-                
+
 		res = db.execute("SELECT * FROM geoplanet_changes WHERE woeid=%s" % addslashes(woeid))
-                
+
                 for row in res :
                         this_woeid, that_woeid, version = row
                         doc['supercededby_woeid'] = that_woeid
 
 		res = db.execute("SELECT * FROM geoplanet_changes WHERE replacedby_woeid=%s" % addslashes(woeid))
 
-               	for row in res :
-                       	that_woeid, this_woeid, version = row
+		for row in res :
+			that_woeid, this_woeid, that_version = row
 
 			# print "%s replaced by %s" % (that_woeid, this_woeid)
-                        
-                        if not doc.has_key('supercedes_woeid') :
-                                doc['supercedes_woeid'] = []
-                                
-                       	doc['supercedes_woeid'].append(that_woeid)
+
+			if not doc.has_key('supercedes_woeid') :
+				doc['supercedes_woeid'] = []
+
+				doc['supercedes_woeid'].append(that_woeid)
 
 			# do we have a record for this (that) woe id?
-                        
+
 			res = solr.search("woeid:%s" % that_woeid)
 
-	                if res.hits == 0 :
-                                docs.append({'woeid' : that_woeid, 'supercededby_woeid' : this_woeid })
+			if res.hits == 0 :
+				that_provider = "geoplanet %s" % that_version
+				docs.append({'woeid' : that_woeid, 'supercededby_woeid' : this_woeid, 'provider' : unicode(that_provider) })
 
-                                        
         # TO DO:
         # check to see if doc:woeid already exists
         # if it does, check to see if there are any
@@ -164,16 +169,16 @@ for ln in codecs.open(gp_places, encoding='utf-8') :
 
         # for k, v in doc.items() :
         #        print "%s\t%s" % (k, v)
-                
+
 	docs.append(doc)
 
 	#
-        
+
 	if len(docs) >= 1000 :
             	print total
 		solr.add(docs, True)
         	docs = []
-                
+
 print "closing db"
 conn.close()
 

@@ -3,7 +3,7 @@
 --
 
 This assumes you're using Solr in "multiple core" mode. If you're not sure what
-that means, start here: 
+that means, start here:
 
 	http://wiki.apache.org/solr/CoreAdmin
 
@@ -18,7 +18,7 @@ In solr/solr.xml add the following to <cores> :
 To start Solr:
 
 	# Note the extra RAM-iness; 128MB is not enough to make the faceting
-	# love 
+	# love
 
 	$> cd /path/to/solr
 	$> java -Dsolr.solr.home=. -Xmx256m -jar start.jar
@@ -39,7 +39,7 @@ Importing GeoPlanet data:
 	# Where x.y.z is the version number of the geoplanet data dump you're
         # importing
 
-	$> sqlite3 geoplanet_x.y.z_sqlite.db
+	$> sqlite3 geoplanet_sqlite_x.y.z.db
 
 	# Set up your tables
 
@@ -58,7 +58,7 @@ Importing GeoPlanet data:
 
 	# Remove the first entry from each table because it will just be the
 	# column headers and not any actual data. If there's a better way to do
-	# this, please let me know. I got bored of looking. 
+	# this, please let me know. I got bored of looking.
 
 	sqlite> DELETE FROM geoplanet_adjacencies WHERE woeid='Place_WOE_ID'
 	sqlite> DELETE FROM geoplanet_aliases WHERE woeid='WOE_ID'
