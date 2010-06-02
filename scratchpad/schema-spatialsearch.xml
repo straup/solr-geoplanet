@@ -1,0 +1,147 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<schema name="geoplanet" version="1.3">
+
+  <!-- start here: http://wiki.apache.org/solr/SpatialSearch -->
+
+    <types>
+
+       <fieldType name="string" class="solr.StrField" sortMissingLast="true" omitNorms="true"/>
+       <fieldType name="double" class="solr.TrieDoubleField" precisionStep="0" omitNorms="true" positionIncrementGap="0"/>
+
+	<!-- why doesn't this work? not in trunk yet?
+	<fieldType name="latlon" class="solr.LatLonType" start="4" end="15" subFieldSuffix="_latLon"/>
+	-->
+
+	<fieldType name="centroid" class="solr.PointType" dimension="2" subFieldSuffix="_d"/>
+	<fieldType name="bbox" class="solr.PointType" dimension="4" subFieldSuffix="_d"/>
+	<fieldType name="geohash" class="solr.GeoHashField" />
+
+        <fieldType name="woeid" class="solr.TrieLongField" />
+
+        <fieldType name="placetype" class="solr.TextField" positionIncrementGap="100">
+	    <analyzer>
+		<tokenizer class="solr.KeywordTokenizerFactory"/>
+        	<filter class="solr.LowerCaseFilterFactory"/>
+	    </analyzer>
+	</fieldType>
+
+        <fieldType name="language" class="solr.TextField" positionIncrementGap="100">
+	    <analyzer>
+		<tokenizer class="solr.KeywordTokenizerFactory"/>
+        	<filter class="solr.LowerCaseFilterFactory"/>
+	    </analyzer>
+	</fieldType>
+
+        <fieldType name="iso" class="solr.TextField" positionIncrementGap="100">
+	    <analyzer>
+		<tokenizer class="solr.KeywordTokenizerFactory"/>
+        	<filter class="solr.LowerCaseFilterFactory"/>
+	    </analyzer>
+	</fieldType>
+
+        <fieldType name="provider" class="solr.TextField" positionIncrementGap="100">
+	    <analyzer>
+		<tokenizer class="solr.StandardTokenizerFactory"/>
+        	<filter class="solr.LowerCaseFilterFactory"/>
+	    </analyzer>
+	</fieldType>
+
+        <fieldType name="placename" class="solr.TextField" positionIncrementGap="100">
+		<analyzer>
+			<tokenizer class="solr.StandardTokenizerFactory" />
+			<!-- is this really necessary w/ StandardTokenFactory? -->
+      			<filter class="solr.WordDelimiterFilterFactory" generatenumberparts="0" generatewordparts="0" catenateall="1" preserveOriginal="1" />
+      			<filter class="solr.ISOLatin1AccentFilterFactory" />
+      			<filter class="solr.LowerCaseFilterFactory" />
+		</analyzer>
+	</fieldType>
+
+        <fieldType name="date" class="solr.TrieDateField" />
+
+    </types>
+
+    <fields>
+
+	<field name="woeid" type="woeid" indexed="true" stored="true"  multiValued="false" required="true" />
+	<field name="parent_woeid" type="woeid" indexed="true" stored="true" multiValued="false" required="false" />
+	<field name="adjacent_woeid" type="woeid" indexed="true" stored="true" multiValued="true" required="false" />
+
+	<field name="supercededby_woeid" type="woeid" indexed="true" stored="true" multiValued="false" required="false" />
+	<field name="supercedes_woeid" type="woeid" indexed="true" stored="true" multiValued="true" required="false" />
+
+	<field name="sameas_woeid" type="woeid" indexed="true" stored="true" multiValued="true" required="false" />
+
+	<field name="placetype" type="placetype" indexed="true" stored="true" multiValued="false" required="false" />
+
+	<!-- dates -->
+
+	<field name="date_indexed" type="date" indexed="false" stored="true" multiValued="false" required="false" default="NOW" />
+	<field name="timezone" type="string" indexed="false" stored="true" />
+
+	<!-- place names -->
+
+        <field name="name" type="placename" indexed="true" stored="true" multiValued="false" required="false" termVectors="true" />
+
+        <field name="names" type="placename" indexed="true" stored="false" multiValued="true" required="false" termVectors="true" />
+        <field name="variants" type="placename" indexed="true" stored="false" multiValued="true" required="false" termVectors="true" />
+
+	<!-- TO DO: use solr.SnowballPorterFilterFactory based on LANG -->
+
+        <dynamicField name="alias_*" type="placename" indexed="false" stored="true" multiValued="true" />
+
+	<!--
+		N type = preferred local name
+		P type = preferred ENG name
+		Q type = a preferred name (in other languages)
+		V type is a valid variant name that is unpreferred
+		S ???
+		A ???
+	-->
+
+	<copyField source="*_V" dest="variants" />
+	<copyField source="*_P" dest="names" />
+	<copyField source="*_Q" dest="names" />
+	<copyField source="*_S" dest="names" />
+	<copyField source="*_A" dest="names" />
+	<copyField source="*_N" dest="names" />
+
+	<copyField source="name" dest="names" />
+
+	<!-- you are here -->
+
+	<field name="lang" type="language" indexed="false" stored="true"  multiValued="false" required="false" />
+	<field name="iso" type="iso" indexed="true" stored="true"  multiValued="false" required="false" />
+
+	<!-- data source -->
+
+	<field name="provider" type="provider" indexed="true" stored="true"  multiValued="false" required="false" />
+
+	<!-- spatial stuff -->
+
+	<!-- why doesn't this work? not in trunk yet?
+	<field name="centroid" type="latlon" indexed="true" stored="true"/>
+	-->
+
+	<field name="centroid" type="centroid" indexed="true" stored="true"/>
+	<field name="bbox" type="bbox" indexed="true" stored="true"/>
+	<field name="geohash" type="geohash" indexed="true" stored="false"/>
+
+	<!-- unique key needs to be a string because of the query parser
+	     this seems like something that can/should be changed in solrconfig.xml -->
+
+	<field name="woeid_s" type="string" indexed="true" stored="false" />
+	<copyField source="woeid" dest="woeid_s" />
+
+	<!-- required by the centroid/bbox types -->
+
+	<dynamicField name="*_d"  type="double" indexed="true"  stored="false"/>
+
+    </fields>
+
+    <!-- see above -->
+    <uniqueKey>woeid_s</uniqueKey>
+
+    <defaultSearchField>name</defaultSearchField>
+    <solrQueryParser defaultOperator="AND"/>
+
+</schema>
