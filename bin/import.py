@@ -163,7 +163,10 @@ for ln in codecs.open(gp_places, encoding='utf-8') :
 			if not doc.has_key('supercedes_woeid') :
 				doc['supercedes_woeid'] = []
 
-				doc['supercedes_woeid'].append(that_woeid)
+			# CHECK ME: supercedes_woeid is not being set correctly in the new record
+			# it could just be that this was indented incorrectly...
+
+			doc['supercedes_woeid'].append(that_woeid)
 
 			# do we have a record for this (that) woe id?
 
