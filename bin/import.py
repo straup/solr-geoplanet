@@ -8,7 +8,10 @@ import os.path
 import sys
 import time
 
-import simplejson as json
+try:
+	import json
+except Exception, e:
+	import simplejson as json
 
 import optparse
 
@@ -19,7 +22,9 @@ parser.add_option("-s", "--solr", dest="solr", help="...")
 parser.add_option("-d", "--data", dest="data", help="...")
 parser.add_option("-e", "--extrasdb", dest="extrasdb", help="...")
 parser.add_option("-v", "--version", dest="version", help="...")
-parser.add_option("-P", "--purge", dest="purge", help="...", default=None, action='store_true')
+
+parser.add_option("-S", "--spatial-solr", dest="spatial_solr", help="...", default=False, action='store_true')
+parser.add_option("-P", "--purge", dest="purge", help="...", default=False, action='store_true')
 
 (opts, args) = parser.parse_args()
 
@@ -40,9 +45,9 @@ for f in (gp_places, gp_sqlite) :
 woe_conn = None
 woe_db = None
 
-if options.extrasdb:
+if opts.extrasdb:
 
-	woe_conn = sqlite3.connect(options.extrasdb)
+	woe_conn = sqlite3.connect(opts.extrasdb)
 	woe_db = woe_conn.cursor()
 
 #
@@ -158,7 +163,7 @@ for ln in codecs.open(gp_places, encoding='utf-8') :
 		for row in res :
 			that_woeid, this_woeid, that_version = row
 
-			# print "%s replaced by %s" % (that_woeid, this_woeid)
+			print "%s replaced by %s" % (that_woeid, this_woeid)
 
 			if not doc.has_key('supercedes_woeid') :
 				doc['supercedes_woeid'] = []
@@ -168,6 +173,8 @@ for ln in codecs.open(gp_places, encoding='utf-8') :
 
 			doc['supercedes_woeid'].append(that_woeid)
 
+			print doc
+
 			# do we have a record for this (that) woe id?
 
 			res = solr.search("woeid:%s" % that_woeid)
@@ -175,40 +182,110 @@ for ln in codecs.open(gp_places, encoding='utf-8') :
 			if res.hits == 0 :
 				that_provider = "geoplanet %s" % that_version
 				docs.append({'woeid' : that_woeid, 'supercededby_woeid' : this_woeid, 'provider' : unicode(that_provider) })
+			else:
+				that_doc = res.docs[0]
+
+				if int(that_doc['supercededby_woeid']) != int(this_woeid):
+				       that_doc['supercededby_woed'] = this_woeid
+				       docs.append(that_doc)
 
 	# WOE extras
 
 	if woe_db:
+
+		row = None
+
 		woe_db.execute("SELECT * FROM woeids WHERE woeid=%s" % woeid)
 		row = woe_db.fetchone()
 
 		if row:
 			data = json.loads(row[1])
 
-			lat = data['centroid']['latitude']
-			lon = data['centroid']['longitude']
+			names = []
+
+			for prop in ('locality1', 'locality2', 'admin1', 'admin2', 'admin3', 'country'):
+
+				if not data.has_key(prop):
+					continue
+
+				if not data[prop]:
+					continue
+
+				if not data[prop].has_key('content'):
+					continue
+
+				if data[prop]['content']:
+					names.append(data[prop]['content'])
+
+			doc['fullname'] = ', '.join(names)
+
+			# print "hname: %s" % doc['hierarchy_name']
+			# print json.dumps(data, indent=4)
+
+			lat = float(data['centroid']['latitude'])
+			lon = float(data['centroid']['longitude'])
 
 			ne = data['boundingBox']['northEast']
 			sw = data['boundingBox']['southWest']
 
-			swlat = sw['latitude']
-			swlon = sw['longitude']
+			swlat = float(sw['latitude'])
+			swlon = float(sw['longitude'])
 
-			nelat = sw['latitude']
-			nelon = sw['longitude']
+			nelat = float(ne['latitude'])
+			nelon = float(ne['longitude'])
 
-			doc['centroid'] = '%s,%s' % (lat,lon)
-			doc['bbox'] = '%s,%s,%s,%s' % (swlat,swlon,nelat,nelon)
+			# doc['geohash'] = Geohash.encode(lat,lon)
 
-        # TO DO:
-        # check to see if doc:woeid already exists
-        # if it does, check to see if there are any
-        # actual updates to apply.
+			if opts.spatial_solr:
+				doc['centroid'] = '%s,%s' % (lat,lon)
+				doc['bbox'] = '%s,%s,%s,%s' % (swlat,swlon,nelat,nelon)
+			else:
+				doc['latitude'] = lat
+				doc['longitude'] = lon
 
-        # for k, v in doc.items() :
-        #        print "%s\t%s" % (k, v)
+				doc['sw_latitude'] = swlat
+				doc['sw_longitude'] = swlon
 
-	docs.append(doc)
+				doc['ne_latitude'] = nelat
+				doc['ne_longitude'] = nelon
+
+	# has changes?
+
+	has_changes_row = False
+
+	if opts.purge:
+		has_changes_row = True
+	else:
+		rsp = solr.search(q='woeid:%s' % doc['woeid'])
+
+		if rsp.hits != 1:
+			has_changes_row = True
+		else:
+			current = rsp.docs[0]
+
+			for k,v in current.items():
+
+				if not doc.has_key(k):
+					print 'doc missing key: %s' % k
+					has_changes_row = True
+					break
+
+				if doc[k] != v:
+					print 'doc has missing value (%s) for key %' % (v, k)
+					has_changes_row = True
+					break
+
+			if not has_changes:
+				for k, v in doc:
+					if not current.has_key(k):
+						print 'current is missing key %s' % k
+						has_changes_row = True
+						break
+
+	#
+
+	if has_changes_row:
+		docs.append(doc)
 
 	#
 
