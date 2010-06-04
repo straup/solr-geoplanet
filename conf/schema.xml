@@ -61,33 +61,40 @@
 	<field name="supercededby_woeid" type="woeid" indexed="true" stored="true" multiValued="false" required="false" />
 	<field name="supercedes_woeid" type="woeid" indexed="true" stored="true" multiValued="true" required="false" />
 
-	<field name="sameas_woeid" type="woeid" indexed="true" stored="true" multiValued="true" required="false" />
-
 	<field name="placetype" type="placetype" indexed="true" stored="true" multiValued="false" required="false" />
 
 	<!-- dates -->
 
 	<field name="date_indexed" type="date" indexed="false" stored="true" multiValued="false" required="false" default="NOW" />
 
+	<!-- hierarchy stuff (experimental) -->
+
+	<field name="fullname" type="placename" indexed="true" stored="true" multiValued="false" required="false" termVectors="true" />
+	<field name="hierarchy_woeid" type="woeid" indexed="true" stored="true" multiValued="false" required="false" termVectors="true" />
+
 	<!-- place names -->
 
-        <field name="name" type="placename" indexed="true" stored="true" multiValued="false" required="false" termVectors="true" />
+	<field name="names" type="placename" indexed="true" stored="false" multiValued="true" required="false" termVectors="true" />
 
-        <field name="names" type="placename" indexed="true" stored="false" multiValued="true" required="false" termVectors="true" />
-        <field name="variants" type="placename" indexed="true" stored="false" multiValued="true" required="false" termVectors="true" />
+	<field name="name" type="placename" indexed="true" stored="true" multiValued="false" required="false" termVectors="true" />
 
-	<!-- TO DO: use solr.SnowballPorterFilterFactory based on LANG -->
+	<copyField source="name" dest="names" />
 
-        <dynamicField name="alias_*" type="placename" indexed="false" stored="true" multiValued="true" />
+	<!-- TO DO: get rid of alias/varients stuff and just use PayLoadTokens
+	-->
+
+	<dynamicField name="alias_*" type="placename" indexed="false" stored="true" multiValued="true" />
 
 	<!--
 		N type = preferred local name
 		P type = preferred ENG name
 		Q type = a preferred name (in other languages)
 		V type is a valid variant name that is unpreferred
-		S ???
-		A ???
+		S is a synonym or "version stripped of accent characters"
+		A is an abbreviation (aka "NYC")
 	-->
+
+	<field name="variants" type="placename" indexed="true" stored="false" multiValued="true" required="false" termVectors="true" />
 
 	<copyField source="*_V" dest="variants" />
 	<copyField source="*_P" dest="names" />
@@ -95,8 +102,6 @@
 	<copyField source="*_S" dest="names" />
 	<copyField source="*_A" dest="names" />
 	<copyField source="*_N" dest="names" />
-
-	<copyField source="name" dest="names" />
 
 	<!-- you are here -->
 
@@ -118,7 +123,7 @@
         <field name="ne_latitude" type="coord" indexed="true" stored="true" multiValued="false" required="false" />
         <field name="ne_longitude" type="coord" indexed="true" stored="true" multiValued="false" required="false" />
 
-        <dynamicField name="_tier_*" type="string" indexed="true" stored="true" multiValued="false" />
+        <dynamicField name="_tier_*" type="string" indexed="true" stored="false" multiValued="false" />
 
     </fields>
 
