@@ -7,6 +7,7 @@ import codecs
 import os.path
 import sys
 import time
+import types
 
 try:
 	import json
@@ -60,6 +61,9 @@ if opts.purge :
 
 docs = []
 total = 0
+
+total_updates = 0
+count_updates = 0
 
 has_changes = False
 
@@ -155,15 +159,16 @@ for ln in codecs.open(gp_places, encoding='utf-8') :
 		res = db.execute("SELECT * FROM geoplanet_changes WHERE woeid=%s" % addslashes(woeid))
 
                 for row in res :
-                        this_woeid, that_woeid, version = row
-                        doc['supercededby_woeid'] = that_woeid
+                        old_woeid, new_woeid, version = row
+			print "changes where old WOE ID is %s: %s" % (old_woeid, new_woeid)
+                        doc['supercededby_woeid'] = new_woeid
 
 		res = db.execute("SELECT * FROM geoplanet_changes WHERE replacedby_woeid=%s" % addslashes(woeid))
 
 		for row in res :
-			that_woeid, this_woeid, that_version = row
+			old_woeid, new_woeid, that_version = row
 
-			print "%s replaced by %s" % (that_woeid, this_woeid)
+			print "%s replaced by %s" % (old_woeid, new_woeid)
 
 			if not doc.has_key('supercedes_woeid') :
 				doc['supercedes_woeid'] = []
@@ -171,23 +176,23 @@ for ln in codecs.open(gp_places, encoding='utf-8') :
 			# CHECK ME: supercedes_woeid is not being set correctly in the new record
 			# it could just be that this was indented incorrectly...
 
-			doc['supercedes_woeid'].append(that_woeid)
+			doc['supercedes_woeid'].append(old_woeid)
 
-			print doc
+			# print doc
 
 			# do we have a record for this (that) woe id?
 
-			res = solr.search("woeid:%s" % that_woeid)
+			res = solr.search("woeid:%s" % old_woeid)
 
 			if res.hits == 0 :
 				that_provider = "geoplanet %s" % that_version
-				docs.append({'woeid' : that_woeid, 'supercededby_woeid' : this_woeid, 'provider' : unicode(that_provider) })
+				docs.append({'woeid' : old_woeid, 'supercededby_woeid' : new_woeid, 'provider' : unicode(that_provider) })
 			else:
-				that_doc = res.docs[0]
+				old_doc = res.docs[0]
+				old_doc['supercededby_woeid'] = new_woeid
 
-				if int(that_doc['supercededby_woeid']) != int(this_woeid):
-				       that_doc['supercededby_woed'] = this_woeid
-				       docs.append(that_doc)
+				print old_doc
+				docs.append(old_doc)
 
 	# WOE extras
 
@@ -263,22 +268,54 @@ for ln in codecs.open(gp_places, encoding='utf-8') :
 		else:
 			current = rsp.docs[0]
 
+			# print doc
+			# print current
+			# sys.exit()
+
 			for k,v in current.items():
 
+				if k in ('date_indexed', 'provider'):
+					continue
+
 				if not doc.has_key(k):
-					print 'doc missing key: %s' % k
+					# print 'doc missing key: %s' % k
 					has_changes_row = True
 					break
 
-				if doc[k] != v:
-					print 'doc has missing value (%s) for key %' % (v, k)
+				doc_v = doc[k]
+
+				if type(doc_v) == types.DictType:
+					doc_v = doc_v['value']
+				elif type(doc_v) == types.ListType and len(doc_v) > 0:
+					if type(doc_v[0]) == types.DictType:
+						tmp = []
+						for d in doc_v:
+							tmp.append(d['value'])
+						doc_v = tmp
+
+					doc_v.sort()
+					doc_v = map(unicode, doc_v)
+					doc_v = ':'.join(doc_v)
+				else:
+					pass
+
+				if type(v) == types.ListType:
+					v.sort()
+					v = map(unicode, v)
+					v = ':'.join(v)
+
+				if doc_v != v:
+					# print "value mismatch for key: %s (doc: %s current: %s)" % (k, doc_v, v)
 					has_changes_row = True
 					break
+				else:
+					pass
 
-			if not has_changes:
-				for k, v in doc:
+			if not has_changes_row:
+				for k, v in doc.items():
+
 					if not current.has_key(k):
-						print 'current is missing key %s' % k
+						# print 'current is missing key %s' % k
 						has_changes_row = True
 						break
 
@@ -289,10 +326,34 @@ for ln in codecs.open(gp_places, encoding='utf-8') :
 
 	#
 
-	if len(docs) >= 1000 :
-            	print total
-		solr.add(docs, True)
-        	docs = []
+	count_docs = len(docs)
+
+	if count_docs >= 1000 :
+		tries = 0
+
+		tts = 10
+
+		while tries < 4:
+
+			try:
+				solr.add(docs, True)
+				docs = []
+
+				count_updates += count_docs
+				total_updates += count_docs
+
+				print "added %s docs (%s total)" % (count_docs, total_updates)
+				break
+			except Exception, e:
+				print "failed to index: %s (sleeping %s seconds)" % (e, tts)
+				time.sleep(tts)
+				tries += 1
+				tts += (tts / 2)
+
+	if count_updates >= 150000:
+		print "resting"
+		time.sleep(10)
+		count_updates = 0
 
 print "closing db"
 conn.close()
