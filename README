@@ -1,4 +1,12 @@
-# The long version: http://www.aaronland.info/weblog/2009/12/21/redacted/#woelr
+# solr-geoplanet
+
+The long version: http://www.aaronland.info/weblog/2009/12/21/redacted/#woelr
+
+## IMPORTANT
+
+_THIS REPOSITORY IS OFFICIALLY DEPRECATED._
+
+It will still work if you've got an old version of Solr 3.1 but all current development is now being on the [woedb-solr](https://github.com/straup/woedb-solr) repository.
 
 --
 
